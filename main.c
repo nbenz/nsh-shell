@@ -14,46 +14,57 @@
 #include <sys/wait.h>
 #include "defs.h"
 
-int run();
-void readline(char*);
-void parseline(char**, char*);
-int executeargs(char**);
-int execute(char**);
-int shellcd(char**);
-int shellexit(char**);
+void run();
+void read_line(char*);
+void parse_line(char**, char*);
+int parse_commands(char***, char**);
 
-int (*specialfunc[])(char **) = {&shellcd, &shellexit};
+int execute_commands(int, char***);
+void execute(char**);
+int pipe_execute(int, int, char***);
+int shell_cd(char**);
+int shell_exit(char**);
+
+int (*special_func[])(char **) = {&shell_cd, &shell_exit};
 char *special[] = {"cd", "exit"};
 
 int main() {
-  int status = run();
-  exit(status);
+  run();
+  exit(EXIT_SUCCESS);
 }
 
-int run() {
+void run() {
   char* line;
   char** args;
-  int status = CONTINUE;
+  char*** cmds;
 
-  while(status == CONTINUE) {
+  int status = CONTINUE;
+  int i = 0;
+  int num_cmds;
+
+  while(1) {
     printf("[mycoolshell]$ ");
 
     line = malloc(sizeof(char)*MAXLINE);
-    readline(line);
+    read_line(line);
 
     args = malloc(sizeof(char*)*MAXLINE);
-    parseline(args, line);
+    parse_line(args, line);
 
-    status = executeargs(args);
+    cmds = malloc(sizeof(char**)*MAXLINE);
+    num_cmds = parse_commands(cmds, args);
+
+    /* status = execute_args(args); */
+    
+    execute_commands(num_cmds, cmds);
 
     free(line);
     free(args);
+    free(cmds);
   }
-
-  return status;
 }
 
-void readline(char *line) {
+void read_line(char *line) {
   int c, i;
   int length = MAXLINE;
 
@@ -78,7 +89,7 @@ void readline(char *line) {
   }
 }
 
-void parseline(char **args, char *line) {
+void parse_line(char **args, char *line) {
   int i = 0;
   int length = MAXWORD; 
   char *word = strtok(line, TOKEN_SPLIT);
@@ -97,32 +108,81 @@ void parseline(char **args, char *line) {
   }
 }
 
-int executeargs(char **args) {
+int parse_commands(char ***cmds, char **args) {
+  int i = 0;
+
+  cmds[i++] = args;
+  while(*args != NULL) {
+    if(strcmp(*args, PIPE) == 0) {
+      *args = NULL;
+      cmds[i++] = args + 1;
+    }
+    *args++;
+  }
+  return i;
+}
+
+void execute(char **args) {
   int i;
   for(i = 0; special[i] != NULL; i++) {
     if(strcmp(special[i], args[0]) == 0) {
-      return (*specialfunc[i])(args);
+      (*special_func[i])(args);
+      return;
     }
   }
-  return execute(args);
+  execvp(args[0], args);
+  fprintf(stderr, "Could not execute: %s\n", args[0]);
+  exit(EXIT_FAILURE);
 }
 
-int execute(char **args) {
+int execute_commands(int n, char ***cmds) {
+  int i;
+  int in, fd[2];
   int pid = fork();
-  int childPid;
   int status;
-  
+
   if(pid == 0) {
-    execvp(args[0], args);
-    fprintf(stderr, "Could not execute: %s\n", args[0]);
-    return EXIT_FAILURE;
+    in = 0;
+
+    for(i = 0; i < n-1; i++) {
+      pipe(fd);
+      status = pipe_execute(in, fd[WRITE], cmds + i);
+      close(fd[WRITE]);
+      in = fd[READ];
+    }
+
+    if(in != 0) {
+      dup2(in, 0);
+    }
+
+    execute(cmds[i]);
   } else {
-    childPid = wait(&status);
+    wait(&status);
+  }
+}
+
+int pipe_execute(int in, int out, char ***cmds) {
+  int status;
+  int pid = fork();
+
+  if(pid == 0) {
+    if(in != 0) {
+      dup2(in, 0);
+      close(in);
+    }
+    if(out != 1) {
+      dup2(out, 1);
+      close(out);
+    }
+
+    execute(*cmds);
+  } else {
+    wait(&status);
   }
   return CONTINUE;
 }
 
-int shellcd(char **args) {
+int shell_cd(char **args) {
   if(args[1] != NULL) {
     chdir(args[1]);
   } else {
@@ -131,7 +191,6 @@ int shellcd(char **args) {
   return CONTINUE;
 }
 
-//Special handling of exit command
-int shellexit(char **args) {
-  return EXIT_SUCCESS;
+int shell_exit(char **args) {
+  exit(EXIT_SUCCESS);
 }
