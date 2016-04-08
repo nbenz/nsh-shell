@@ -4,7 +4,7 @@
  * Lab 8
  *
  * This program implements a simple shell that 
- * can fork and exec commands, cd, and exit
+ * can pipe and exec commands, cd, and exit
  */
 
 #include <stdlib.h>
@@ -21,7 +21,8 @@ int parse_commands(char***, char**);
 
 int execute_commands(int, char***);
 void execute(char**);
-int pipe_execute(int, int, char***);
+void execute_args(char**);
+int run_pipe(int, int, char***);
 int shell_cd(char**);
 int shell_exit(char**);
 
@@ -36,11 +37,11 @@ int main() {
 void run() {
   char* line;
   char** args;
-  char*** cmds;
+  char*** commands;
 
   int status = CONTINUE;
   int i = 0;
-  int num_cmds;
+  int num_commands;
 
   while(1) {
     printf("[mycoolshell]$ ");
@@ -51,16 +52,16 @@ void run() {
     args = malloc(sizeof(char*)*MAXLINE);
     parse_line(args, line);
 
-    cmds = malloc(sizeof(char**)*MAXLINE);
-    num_cmds = parse_commands(cmds, args);
-
-    /* status = execute_args(args); */
-    
-    execute_commands(num_cmds, cmds);
+    commands = malloc(sizeof(char**)*MAXLINE);
+    num_commands = parse_commands(commands, args);
+    if(num_commands == 1)
+      execute_args(commands[0]);
+    else
+      execute_commands(num_commands, commands);
 
     free(line);
     free(args);
-    free(cmds);
+    free(commands);
   }
 }
 
@@ -108,21 +109,21 @@ void parse_line(char **args, char *line) {
   }
 }
 
-int parse_commands(char ***cmds, char **args) {
+int parse_commands(char ***commands, char **args) {
   int i = 0;
 
-  cmds[i++] = args;
+  commands[i++] = args;
   while(*args != NULL) {
     if(strcmp(*args, PIPE) == 0) {
       *args = NULL;
-      cmds[i++] = args + 1;
+      commands[i++] = args + 1;
     }
     *args++;
   }
   return i;
 }
 
-void execute(char **args) {
+void execute_args(char **args) {
   int i;
   for(i = 0; special[i] != NULL; i++) {
     if(strcmp(special[i], args[0]) == 0) {
@@ -130,52 +131,65 @@ void execute(char **args) {
       return;
     }
   }
-  execvp(args[0], args);
-  fprintf(stderr, "Could not execute: %s\n", args[0]);
-  exit(EXIT_FAILURE);
+  execute(args);
 }
 
-int execute_commands(int n, char ***cmds) {
-  int i;
-  int in, fd[2];
-  int pid = fork();
+void execute(char **args) {
   int status;
 
-  if(pid == 0) {
-    in = 0;
-
-    for(i = 0; i < n-1; i++) {
-      pipe(fd);
-      status = pipe_execute(in, fd[WRITE], cmds + i);
-      close(fd[WRITE]);
-      in = fd[READ];
-    }
-
-    if(in != 0) {
-      dup2(in, 0);
-    }
-
-    execute(cmds[i]);
+  if(fork() == 0) {
+    execvp(args[0], args);
+    fprintf(stderr, "Could not execute: %s\n", args[0]);
+    exit(EXIT_FAILURE);
   } else {
     wait(&status);
   }
 }
 
-int pipe_execute(int in, int out, char ***cmds) {
+int execute_commands(int n, char ***commands) {
+  int i;
+  int in, fd[2];
+  int status;
+
+  if(fork() == 0) {
+    in = 0;
+
+    for(i = 0; i < n-1; i++) {
+      pipe(fd);
+      status = run_pipe(in, fd[WRITE], commands + i);
+      close(fd[WRITE]);
+      in = fd[READ]; 
+    }
+
+    if(in != READ) {
+      dup2(in, READ);
+    }
+
+    execvp(commands[i][0], commands[i]);
+    fprintf(stderr, "Could not execute: %s\n", *commands[0]);
+    exit(EXIT_FAILURE);
+  } else {
+    wait(&status);
+  }
+}
+
+int run_pipe(int in, int out, char ***commands) {
   int status;
   int pid = fork();
 
   if(pid == 0) {
-    if(in != 0) {
-      dup2(in, 0);
+    if(in != READ) {
+      dup2(in, READ);
       close(in);
     }
-    if(out != 1) {
-      dup2(out, 1);
+    if(out != WRITE) {
+      dup2(out, WRITE);
       close(out);
     }
 
-    execute(*cmds);
+    execvp(*commands[0], *commands);
+    fprintf(stderr, "Could not execute: %s\n", *commands[0]);
+    exit(EXIT_FAILURE);
   } else {
     wait(&status);
   }
