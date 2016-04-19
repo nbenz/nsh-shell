@@ -34,6 +34,7 @@ int main() {
   exit(EXIT_SUCCESS);
 }
 
+//Main run loop
 void run() {
   char* line;
   char** args;
@@ -54,10 +55,16 @@ void run() {
 
     commands = malloc(sizeof(char**)*MAXLINE);
     num_commands = parse_commands(commands, args);
+
+    /* Ideally this shouldn't take so many methods to handle,
+     * but handling the built-ins wasn't playing nice with the pipes.
+     * Still working on DRYing this up.
+     */
+
     if(num_commands == 1)
-      execute_args(commands[0]);
-    else
-      execute_commands(num_commands, commands);
+      execute_args(commands[0]); //Use standard argument handler
+    else                             
+      execute_commands(num_commands, commands); //Use piping routine
 
     free(line);
     free(args);
@@ -65,6 +72,7 @@ void run() {
   }
 }
 
+//Reads in a line from stdin
 void read_line(char *line) {
   int c, i;
   int length = MAXLINE;
@@ -90,6 +98,7 @@ void read_line(char *line) {
   }
 }
 
+//Splits line in to arguments (delimited by whitespace)
 void parse_line(char **args, char *line) {
   int i = 0;
   int length = MAXWORD; 
@@ -109,6 +118,7 @@ void parse_line(char **args, char *line) {
   }
 }
 
+//Splits argument list into commands (delimited by vertical pipes | )
 int parse_commands(char ***commands, char **args) {
   int i = 0;
 
@@ -123,6 +133,7 @@ int parse_commands(char ***commands, char **args) {
   return i;
 }
 
+//Execute an argument list, checking for built in functions first
 void execute_args(char **args) {
   int i;
   for(i = 0; special[i] != NULL; i++) {
@@ -134,6 +145,7 @@ void execute_args(char **args) {
   execute(args);
 }
 
+//Execute arguments that can be execvp'd
 void execute(char **args) {
   int status;
 
@@ -146,6 +158,7 @@ void execute(char **args) {
   }
 }
 
+//Execute a command list that needs to be piped
 int execute_commands(int n, char ***commands) {
   int i;
   int in, fd[2];
@@ -158,14 +171,14 @@ int execute_commands(int n, char ***commands) {
       pipe(fd);
       status = run_pipe(in, fd[WRITE], commands + i);
       close(fd[WRITE]);
-      in = fd[READ]; 
+      in = fd[READ]; //Save read end for next command
     }
 
     if(in != READ) {
       dup2(in, READ);
     }
 
-    execvp(commands[i][0], commands[i]);
+    execvp(commands[i][0], commands[i]); //Execute the last command, printing to stdout
     fprintf(stderr, "Could not execute: %s\n", *commands[0]);
     exit(EXIT_FAILURE);
   } else {
@@ -173,6 +186,7 @@ int execute_commands(int n, char ***commands) {
   }
 }
 
+//Execute arguments on a pipe
 int run_pipe(int in, int out, char ***commands) {
   int status;
   int pid = fork();
@@ -196,6 +210,7 @@ int run_pipe(int in, int out, char ***commands) {
   return CONTINUE;
 }
 
+//Built in for 'cd'
 int shell_cd(char **args) {
   if(args[1] != NULL) {
     chdir(args[1]);
@@ -205,6 +220,7 @@ int shell_cd(char **args) {
   return CONTINUE;
 }
 
+//Built in for 'exit'
 int shell_exit(char **args) {
   exit(EXIT_SUCCESS);
 }

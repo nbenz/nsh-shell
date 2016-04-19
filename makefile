@@ -11,4 +11,4 @@ debug: defs.h main.c getch.c
 	gcc -g -o d_nsh defs.h main.c getch.c
 
 clean:
-	rm main.o getch.o nsh d_nsh
+	rm -f main.o getch.o nsh d_nsh
