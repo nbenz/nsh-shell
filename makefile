@@ -1,14 +1,23 @@
-nsh : defs.h main.o getch.o 
-	gcc -lm -o nsh main.o getch.o
+client: defs.h client.c
+	gcc -o client client.c
 
-main.o : main.c defs.h 
-	gcc -c main.c
+server: defs.h server.o shell.o getch.o
+	gcc -lm -o server server.o shell.o getch.o
 
-getch.o : getch.c
+server.o: server.c
+	gcc -c server.c
+
+shell.o: shell.c
+	gcc -c shell.c
+
+getch.o: getch.c
 	gcc -c getch.c
 
-debug: defs.h main.c getch.c
-	gcc -g -o d_nsh defs.h main.c getch.c
+debugs:
+	gcc -g -o d_server server.c
 
-clean:
-	rm -f main.o getch.o nsh d_nsh
+debugc:
+	gcc -g -o d_client client.c
+
+clean: 
+	rm -f server d_server client d_client server.o client.o

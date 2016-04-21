@@ -14,7 +14,6 @@
 #include <sys/wait.h>
 #include "defs.h"
 
-void run();
 void read_line(char*);
 void parse_line(char**, char*);
 int parse_commands(char***, char**);
@@ -29,13 +28,8 @@ int shell_exit(char**);
 int (*special_func[])(char **) = {&shell_cd, &shell_exit};
 char *special[] = {"cd", "exit"};
 
-int main() {
-  run();
-  exit(EXIT_SUCCESS);
-}
-
 //Main run loop
-void run() {
+void runShell() {
   char* line;
   char** args;
   char*** commands;
@@ -46,9 +40,11 @@ void run() {
 
   while(1) {
     printf("[mycoolshell]$ ");
+    fflush(stdout);
 
     line = malloc(sizeof(char)*MAXLINE);
     read_line(line);
+    fprintf(stderr, "received: %s\n", line);
 
     args = malloc(sizeof(char*)*MAXLINE);
     parse_line(args, line);
@@ -123,6 +119,7 @@ int parse_commands(char ***commands, char **args) {
   int i = 0;
 
   commands[i++] = args;
+    fflush(stdout);
   while(*args != NULL) {
     if(strcmp(*args, PIPE) == 0) {
       *args = NULL;
