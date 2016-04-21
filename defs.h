@@ -7,6 +7,7 @@
 #define MAXLINE 128
 #define MAX_TRIES 5 
 #define MAXWORD 32
+#define MESSAGE_END '\x3'
 #define PIPE "|"
 #define SHELL_PROMPT "[mycoolshell]$ "
 #define TOKEN_SPLIT " \t\n"

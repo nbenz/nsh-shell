@@ -39,7 +39,8 @@ void runShell() {
   int num_commands;
 
   while(1) {
-    printf("[mycoolshell]$ ");
+    printf(SHELL_PROMPT);
+    putchar(MESSAGE_END);
     fflush(stdout);
 
     line = malloc(sizeof(char)*MAXLINE);
@@ -119,7 +120,6 @@ int parse_commands(char ***commands, char **args) {
   int i = 0;
 
   commands[i++] = args;
-    fflush(stdout);
   while(*args != NULL) {
     if(strcmp(*args, PIPE) == 0) {
       *args = NULL;

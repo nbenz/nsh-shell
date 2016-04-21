@@ -13,6 +13,7 @@
 
 unsigned long promptForINETAddress();
 unsigned long nameToAddr();
+void readAndPrint(int);
 
 int connectToHost(char*, int);
 void run(int);
@@ -108,16 +109,7 @@ void run(int fd) {
   int bytes;
 
   while(1) {
-    line = malloc(BUFSIZE + 1);
-    bytes = read(fd, line, BUFSIZE);
-    line[bytes] = '\0';
-    
-    if(bytes < 0)
-      fprintf(stderr, "client: error reading");
-
-    printf(line);
-
-    free(line);
+    readAndPrint(fd);
     line = malloc(BUFSIZE + 1);
     length = getline(&line, &length, stdin);
 
@@ -126,9 +118,20 @@ void run(int fd) {
     if(bytes != length)
       fprintf(stderr, "client: error writing");
 
-    if(strcmp(line, "exit") == 0)
+    if(strcmp(line, "exit\n") == 0)
       break;
 
     free(line);
+  }
+}
+
+void readAndPrint(int fd) {
+  char c;
+  int n;
+
+  n = read(fd, &c, 1);
+  while(n > 0 && c != MESSAGE_END) {
+    putchar(c);
+    n = read(fd, &c, 1);
   }
 }
